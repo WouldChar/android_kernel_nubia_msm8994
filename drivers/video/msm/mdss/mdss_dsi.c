@@ -155,7 +155,6 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 {
 	int ret = 0;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
-	int i = 0;
 
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
@@ -192,20 +191,12 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 #endif
 	}
 
-	for (i = DSI_MAX_PM - 1; i >= 0; i--) {
-		/*
-		 * Core power module will be disabled when the
-		 * clocks are disabled
-		 */
-		if (DSI_CORE_PM == i)
-			continue;
-		ret = msm_dss_enable_vreg(
-			ctrl_pdata->power_data[i].vreg_config,
-			ctrl_pdata->power_data[i].num_vreg, 0);
-		if (ret)
-			pr_err("%s: failed to disable vregs for %s\n",
-				__func__, __mdss_dsi_pm_name(i));
-	}
+	ret = msm_dss_enable_vreg(
+		ctrl_pdata->power_data[DSI_PANEL_PM].vreg_config,
+		ctrl_pdata->power_data[DSI_PANEL_PM].num_vreg, 0);
+	if (ret)
+		pr_err("%s: failed to disable vregs for %s\n",
+			__func__, __mdss_dsi_pm_name(DSI_PANEL_PM));
 
 end:
 	return ret;
@@ -215,7 +206,6 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 {
 	int ret = 0;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
-	int i = 0;
 
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
@@ -225,21 +215,13 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	for (i = 0; i < DSI_MAX_PM; i++) {
-		/*
-		 * Core power module will be enabled when the
-		 * clocks are enabled
-		 */
-		if (DSI_CORE_PM == i)
-			continue;
-		ret = msm_dss_enable_vreg(
-			ctrl_pdata->power_data[i].vreg_config,
-			ctrl_pdata->power_data[i].num_vreg, 1);
-		if (ret) {
-			pr_err("%s: failed to enable vregs for %s\n",
-				__func__, __mdss_dsi_pm_name(i));
-			goto error;
-		}
+	ret = msm_dss_enable_vreg(
+		ctrl_pdata->power_data[DSI_PANEL_PM].vreg_config,
+		ctrl_pdata->power_data[DSI_PANEL_PM].num_vreg, 1);
+	if (ret) {
+		pr_err("%s: failed to enable vregs for %s\n",
+			__func__, __mdss_dsi_pm_name(DSI_PANEL_PM));
+		return ret;
 	}
 #ifdef CONFIG_ZTEMT_MIPI_1080P_R63417_SHARP_IPS_5P5
 	mdelay(10);
@@ -256,8 +238,6 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 		udelay(2000);
 #endif
 	}
-
-	i--;
 
 	/*
 	 * If continuous splash screen feature is enabled, then we need to
@@ -279,13 +259,6 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 #endif
 	}
 
-error:
-	if (ret) {
-		for (; i >= 0; i--)
-			msm_dss_enable_vreg(
-				ctrl_pdata->power_data[i].vreg_config,
-				ctrl_pdata->power_data[i].num_vreg, 0);
-	}
 	return ret;
 }
 
