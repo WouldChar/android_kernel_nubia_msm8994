@@ -24,7 +24,6 @@
 #include "kgsl_cffdump.h"
 #include "kgsl_device.h"
 #include "kgsl_log.h"
-#include "kgsl_trace.h"
 
 static DEFINE_MUTEX(kernel_map_global_lock);
 
@@ -563,15 +562,9 @@ EXPORT_SYMBOL(kgsl_cache_range_op);
 #ifndef CONFIG_ALLOC_BUFFERS_IN_4K_CHUNKS
 static inline int get_page_size(size_t size, unsigned int align)
 {
-	if (align >= ilog2(SZ_64K) && size >= SZ_1M)
-		return SZ_1M;
-	if (align >= ilog2(SZ_64K) && size >= SZ_64K)
-		return SZ_64K;
-	if (size >= SZ_16K)
-		return SZ_16K;
-	return PAGE_SIZE;
+	return (align >= ilog2(SZ_64K) && size >= SZ_64K)
+					? SZ_64K : PAGE_SIZE;
 }
-
 #else
 static inline int get_page_size(size_t size, unsigned int align)
 {
@@ -590,6 +583,7 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 	pgprot_t page_prot = pgprot_writecombine(PAGE_KERNEL);
 	void *ptr;
 	unsigned int align;
+	int step = ((VMALLOC_END - VMALLOC_START)/8) >> PAGE_SHIFT;
 
 	size = PAGE_ALIGN(size);
 	if (size == 0 || size > UINT_MAX)
@@ -603,13 +597,15 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 	 * The alignment cannot be less than the intended page size - it can be
 	 * larger however to accomodate hardware quirks
 	 */
-	if (align < ilog2(page_size))
+
+	if (ilog2(align) < page_size)
 		kgsl_memdesc_set_align(memdesc, ilog2(page_size));
 
 	/*
 	 * There needs to be enough room in the sg structure to be able to
 	 * service the allocation entirely with PAGE_SIZE sized chunks
 	 */
+
 	sglen_alloc = PAGE_ALIGN(size) >> PAGE_SHIFT;
 
 	memdesc->pagetable = pagetable;
@@ -636,19 +632,29 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 	if (!is_vmalloc_addr(memdesc->pages))
 		kmemleak_not_leak(memdesc->pages);
 
-	len = size;
 
-	// only care about size for tracing
-	trace_kgsl_sharedmem_page_alloc(size, page_size, align);
+	len = size;
 
 	while (len > 0) {
 		struct page *page;
+		unsigned int gfp_mask = __GFP_HIGHMEM;
+		int j;
 
 		/* don't waste space at the end of the allocation*/
 		if (len < page_size)
 			page_size = PAGE_SIZE;
 
-		page = kgsl_heap_alloc(page_size);
+		/*
+		 * Don't do some of the more aggressive memory recovery
+		 * techniques for large order allocations
+		 */
+		if (page_size != PAGE_SIZE)
+			gfp_mask |= __GFP_COMP | __GFP_NORETRY |
+				__GFP_NO_KSWAPD | __GFP_NOWARN;
+		else
+			gfp_mask |= GFP_KERNEL;
+
+		page = alloc_pages(gfp_mask, get_order(page_size));
 
 		if (page == NULL) {
 			if (page_size != PAGE_SIZE) {
