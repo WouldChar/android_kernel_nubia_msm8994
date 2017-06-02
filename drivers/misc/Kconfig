@@ -24,9 +24,8 @@ config TPS65132
 	tristate "Texas Instruments TPS65132 Driver"
 	help
 
-
 config FSA8069
-	tristate " FAS8069 Driver"
+	tristate "FAS8069 Driver"
 
 config AD525X_DPOT
 	tristate "Analog Devices Digital Potentiometers"
