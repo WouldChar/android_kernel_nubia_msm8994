@@ -470,17 +470,12 @@ static int ubifs_readdir(struct file *file, void *dirent, filldir_t filldir)
 	}
 
 out:
-	if (err != -ENOENT) {
-		ubifs_err("cannot find next direntry, error %d", c->vi.ubi_num,
-				err);
-		return err;
-	}
-
 	kfree(file->private_data);
 	file->private_data = NULL;
 
 	if (err != -ENOENT)
-		ubifs_err("cannot find next direntry, error %d", err);
+		ubifs_err("cannot find next direntry, error %d", c->vi.ubi_num,
+				err);
 	else
 		/*
 		 * -ENOENT is a non-fatal error in this context, the TNC uses
