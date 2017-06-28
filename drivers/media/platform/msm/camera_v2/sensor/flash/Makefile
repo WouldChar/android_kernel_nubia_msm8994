@@ -11,3 +11,6 @@ obj-$(CONFIG_MSMB_CAMERA) += msm_flash.o
 obj-$(CONFIG_MACH_YULONG) += msm_led_gpio_trigger.o
 obj-$(CONFIG_MACH_YULONG) += sgm3780.o
 obj-$(CONFIG_MSMB_CAMERA) += lm3642.o
+ifeq ($(CONFIG_MACH_OPPO),y)
+obj-$(CONFIG_MSMB_CAMERA) += lm3643.o
+endif
