@@ -510,11 +510,10 @@ static noinline int hiddev_ioctl_usage(struct hiddev *hiddev, unsigned int cmd, 
 				goto inval;
 
 			field = report->field[uref->field_index];
+		}
 
-			if (cmd == HIDIOCGCOLLECTIONINDEX) {
-				if (uref->usage_index >= field->maxusage)
-					goto inval;
-			} else if (uref->usage_index >= field->report_count)
+		if (cmd == HIDIOCGCOLLECTIONINDEX) {
+			if (uref->usage_index >= field->maxusage)
 				goto inval;
 		}
 
