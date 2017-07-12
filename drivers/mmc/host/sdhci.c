@@ -1437,9 +1437,8 @@ clock_set:
 			goto ret;
 		}
 		timeout--;
-		udelay(1);
 		spin_unlock_irq(&host->lock);
-		usleep_range(900, 1100);
+		udelay(1);
 		spin_lock_irq(&host->lock);
 	}
 
