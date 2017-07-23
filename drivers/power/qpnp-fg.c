@@ -45,7 +45,6 @@ module_param_named(
 #endif
 
 #ifdef CONFIG_ZTEMT_MSM8994_FUEL_GAUGE
-//´ò¿ªµ÷ÊÔ½Ó¿Ú
 //#undef pr_debug
 //#define pr_debug   pr_info
 #undef KERN_INFO
