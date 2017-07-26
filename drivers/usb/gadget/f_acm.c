@@ -137,7 +137,7 @@ static int acm_port_connect(struct f_acm *acm)
 	port_num = gacm_ports[acm->port_num].client_port_num;
 
 
-	pr_debug("%s: transport:%s f_acm:%p gserial:%p port_num:%d cl_port_no:%d\n",
+	pr_debug("%s: transport:%s f_acm:%pK gserial:%pK port_num:%d cl_port_no:%d\n",
 			__func__, xport_to_str(acm->transport),
 			acm, &acm->port, acm->port_num, port_num);
 
@@ -163,7 +163,7 @@ static int acm_port_disconnect(struct f_acm *acm)
 
 	port_num = gacm_ports[acm->port_num].client_port_num;
 
-	pr_debug("%s: transport:%s f_acm:%p gserial:%p port_num:%d cl_pno:%d\n",
+	pr_debug("%s: transport:%s f_acm:%pK gserial:%pK port_num:%d cl_pno:%d\n",
 			__func__, xport_to_str(acm->transport),
 			acm, &acm->port, acm->port_num, port_num);
 
@@ -641,13 +641,15 @@ static int acm_notify_serial_state(struct f_acm *acm)
 {
 	struct usb_composite_dev *cdev = acm->port.func.config->cdev;
 	int			status;
+	__le16			serial_state;
 
 	spin_lock(&acm->lock);
 	if (acm->notify_req) {
 		DBG(cdev, "acm ttyGS%d serial state %04x\n",
 				acm->port_num, acm->serial_state);
+		serial_state = cpu_to_le16(acm->serial_state);
 		status = acm_cdc_notify(acm, USB_CDC_NOTIFY_SERIAL_STATE,
-				0, &acm->serial_state, sizeof(acm->serial_state));
+				0, &serial_state, sizeof(acm->serial_state));
 	} else {
 		acm->pending = true;
 		status = 0;
@@ -827,7 +829,7 @@ fail:
 	if (acm->port.in)
 		acm->port.in->driver_data = NULL;
 
-	ERROR(cdev, "%s/%p: can't bind, err %d\n", f->name, f, status);
+	ERROR(cdev, "%s/%pK: can't bind, err %d\n", f->name, f, status);
 
 	return status;
 }

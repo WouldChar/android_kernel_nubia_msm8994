@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -67,7 +67,7 @@ static void msm_ispif_io_dump_reg(struct ispif_device *ispif)
 
 
 static inline int msm_ispif_is_intf_valid(uint32_t csid_version,
-	uint8_t intf_type)
+	enum msm_ispif_vfe_intf intf_type)
 {
 	return ((csid_version <= CSID_VERSION_V22 && intf_type != VFE0) ||
 		(intf_type >= VFE_MAX)) ? false : true;
@@ -316,7 +316,7 @@ static int msm_ispif_reset(struct ispif_device *ispif)
 			ispif->base + ISPIF_VFE_m_INTF_CMD_0(i));
 		msm_camera_io_w(ISPIF_STOP_INTF_IMMEDIATELY,
 			ispif->base + ISPIF_VFE_m_INTF_CMD_1(i));
-		pr_debug("%s: base %lx", __func__, (unsigned long)ispif->base);
+		pr_debug("%s: base %pK", __func__, ispif->base);
 		msm_camera_io_w(0, ispif->base +
 			ISPIF_VFE_m_PIX_INTF_n_CID_MASK(i, 0));
 		msm_camera_io_w(0, ispif->base +
@@ -350,7 +350,7 @@ static int msm_ispif_subdev_g_chip_ident(struct v4l2_subdev *sd,
 }
 
 static void msm_ispif_sel_csid_core(struct ispif_device *ispif,
-	uint8_t intftype, uint8_t csid, uint8_t vfe_intf)
+	uint8_t intftype, uint8_t csid, enum msm_ispif_vfe_intf vfe_intf)
 {
 	uint32_t data;
 
@@ -365,23 +365,23 @@ static void msm_ispif_sel_csid_core(struct ispif_device *ispif,
 	switch (intftype) {
 	case PIX0:
 		data &= ~(BIT(1) | BIT(0));
-		data |= csid;
+		data |= (uint32_t) csid;
 		break;
 	case RDI0:
 		data &= ~(BIT(5) | BIT(4));
-		data |= (csid << 4);
+		data |= ((uint32_t) csid) << 4;
 		break;
 	case PIX1:
 		data &= ~(BIT(9) | BIT(8));
-		data |= (csid << 8);
+		data |= ((uint32_t) csid) << 8;
 		break;
 	case RDI1:
 		data &= ~(BIT(13) | BIT(12));
-		data |= (csid << 12);
+		data |= ((uint32_t) csid) << 12;
 		break;
 	case RDI2:
 		data &= ~(BIT(21) | BIT(20));
-		data |= (csid << 20);
+		data |= ((uint32_t) csid) << 20;
 		break;
 	}
 
@@ -390,7 +390,7 @@ static void msm_ispif_sel_csid_core(struct ispif_device *ispif,
 }
 
 static void msm_ispif_enable_crop(struct ispif_device *ispif,
-	uint8_t intftype, uint8_t vfe_intf, uint16_t start_pixel,
+	uint8_t intftype, enum msm_ispif_vfe_intf vfe_intf, uint16_t start_pixel,
 	uint16_t end_pixel)
 {
 	uint32_t data;
@@ -422,7 +422,7 @@ static void msm_ispif_enable_crop(struct ispif_device *ispif,
 }
 
 static void msm_ispif_enable_intf_cids(struct ispif_device *ispif,
-	uint8_t intftype, uint16_t cid_mask, uint8_t vfe_intf, uint8_t enable)
+	uint8_t intftype, uint16_t cid_mask, enum msm_ispif_vfe_intf vfe_intf, uint8_t enable)
 {
 	uint32_t intf_addr, data;
 
@@ -457,14 +457,14 @@ static void msm_ispif_enable_intf_cids(struct ispif_device *ispif,
 
 	data = msm_camera_io_r(ispif->base + intf_addr);
 	if (enable)
-		data |= cid_mask;
+		data |=  (uint32_t) cid_mask;
 	else
-		data &= ~cid_mask;
+		data &= ~((uint32_t) cid_mask);
 	msm_camera_io_w_mb(data, ispif->base + intf_addr);
 }
 
 static int msm_ispif_validate_intf_status(struct ispif_device *ispif,
-	uint8_t intftype, uint8_t vfe_intf)
+	uint8_t intftype, enum msm_ispif_vfe_intf vfe_intf)
 {
 	int rc = 0;
 	uint32_t data = 0;
@@ -504,7 +504,7 @@ static int msm_ispif_validate_intf_status(struct ispif_device *ispif,
 }
 
 static void msm_ispif_select_clk_mux(struct ispif_device *ispif,
-	uint8_t intftype, uint8_t csid, uint8_t vfe_intf)
+	uint8_t intftype, uint8_t csid, enum msm_ispif_vfe_intf vfe_intf)
 {
 	uint32_t data = 0;
 
@@ -563,7 +563,7 @@ static uint16_t msm_ispif_get_cids_mask_from_cfg(
 
 	BUG_ON(!entry);
 
-	for (i = 0; i < entry->num_cids; i++)
+	for (i = 0; i < entry->num_cids && i < MAX_CID_CH_V2; i++)
 		cids_mask |= (1 << entry->cids[i]);
 
 	return cids_mask;
@@ -692,7 +692,7 @@ static void msm_ispif_intf_cmd(struct ispif_device *ispif, uint32_t cmd_bits,
 			pr_err("%s: invalid interface type\n", __func__);
 			return;
 		}
-		if (params->entries[i].num_cids > MAX_CID_CH) {
+		if (params->entries[i].num_cids > MAX_CID_CH_V2) {
 			pr_err("%s: out of range of cid_num %d\n",
 				__func__, params->entries[i].num_cids);
 			return;
@@ -1136,9 +1136,13 @@ static irqreturn_t msm_io_ispif_irq(int irq_num, void *data)
 static int msm_ispif_set_vfe_info(struct ispif_device *ispif,
 	struct msm_ispif_vfe_info *vfe_info)
 {
-	memcpy(&ispif->vfe_info, vfe_info, sizeof(struct msm_ispif_vfe_info));
-	if (ispif->vfe_info.num_vfe > ispif->hw_num_isps)
+	if (!vfe_info || (vfe_info->num_vfe <= 0) ||
+		((uint32_t)(vfe_info->num_vfe) > ispif->hw_num_isps)) {
+		pr_err("Invalid VFE info: %p %d\n", vfe_info,
+			(vfe_info ? vfe_info->num_vfe:0));
 		return -EINVAL;
+	}
+	memcpy(&ispif->vfe_info, vfe_info, sizeof(struct msm_ispif_vfe_info));
 	return 0;
 }
 
@@ -1314,8 +1318,11 @@ static long msm_ispif_subdev_ioctl(struct v4l2_subdev *sd,
 	case MSM_SD_SHUTDOWN: {
 		struct ispif_device *ispif =
 			(struct ispif_device *)v4l2_get_subdevdata(sd);
-		if (ispif && ispif->base)
+		if (ispif && ispif->base) {
+			mutex_lock(&ispif->mutex);
 			msm_ispif_release(ispif);
+			mutex_unlock(&ispif->mutex);
+		}
 		return 0;
 	}
 	default:

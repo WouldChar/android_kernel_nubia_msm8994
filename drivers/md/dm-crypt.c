@@ -1311,12 +1311,15 @@ static int crypt_set_key(struct crypt_config *cc, char *key)
 	if (!cc->key_size && strcmp(key, "-"))
 		goto out;
 
+	/* clear the flag since following operations may invalidate previously valid key */
+	clear_bit(DM_CRYPT_KEY_VALID, &cc->flags);
+
 	if (cc->key_size && crypt_decode_key(cc->key, key, cc->key_size) < 0)
 		goto out;
 
-	set_bit(DM_CRYPT_KEY_VALID, &cc->flags);
-
 	r = crypt_setkey_allcpus(cc);
+	if (!r)
+		set_bit(DM_CRYPT_KEY_VALID, &cc->flags);
 
 out:
 	/* Hex key string not needed after here, so wipe it. */
@@ -1650,6 +1653,7 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 
 	ret = -ENOMEM;
 	cc->io_queue = alloc_workqueue("kcryptd_io",
+				       WQ_HIGHPRI |
 				       WQ_NON_REENTRANT|
 				       WQ_MEM_RECLAIM,
 				       1);
@@ -1659,7 +1663,8 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	}
 
 	cc->crypt_queue = alloc_workqueue("kcryptd",
-					  WQ_CPU_INTENSIVE | WQ_MEM_RECLAIM |
+					  WQ_HIGHPRI |
+					  WQ_MEM_RECLAIM |
 					  WQ_UNBOUND, num_online_cpus());
 	if (!cc->crypt_queue) {
 		ti->error = "Couldn't create kcryptd queue";
