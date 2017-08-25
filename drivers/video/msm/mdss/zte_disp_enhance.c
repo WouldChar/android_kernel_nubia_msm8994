@@ -15,21 +15,10 @@
 #define ZTE_DISP_ENHANCE_DEBUG		0
 #define ZTEMT_LCD_CORLORTMP_DEBUG 	0
 
-
 /*mdp adjust colortmp mayu add*/
-#if defined(CONFIG_ZTEMT_LCD_1080P_R63315_SHARP_IPS_5P0)
-#include "zte_disp_enhance_NX508J.h"
-#endif
-
-
 #if defined(CONFIG_ZTEMT_MIPI_1080P_R63417_SHARP_IPS_5P5)
-#include "zte_disp_enhance_NX510J.h"
+#include "zte_disp_enhance_nx510j.h"
 #endif
-
-#if defined(CONFIG_ZTEMT_MIPI_2K_R63419_SHARP_IPS_5P5)
-#include "zte_disp_enhance_NX509J.h"
-#endif
-
 
 #if ZTEMT_LCD_CORLORTMP_DEBUG
 

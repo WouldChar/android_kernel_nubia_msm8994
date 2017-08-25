@@ -14,7 +14,6 @@ snd-soc-ak4535-objs := ak4535.o
 snd-soc-ak4641-objs := ak4641.o
 snd-soc-ak4642-objs := ak4642.o
 snd-soc-ak4671-objs := ak4671.o
-snd-soc-ak4961-objs := ak4961.o ak4961-tables.o
 snd-soc-ak5386-objs := ak5386.o
 snd-soc-ak4375-objs := ak4375.o
 snd-soc-arizona-objs := arizona.o
@@ -142,9 +141,6 @@ obj-$(CONFIG_SND_SOC_MSM_HDMI_CODEC_RX) := msm_hdmi_codec_rx.o
 # Amp
 snd-soc-max9877-objs := max9877.o
 snd-soc-tpa6130a2-objs := tpa6130a2.o
-#add by wuzheui
-snd-soc-tfa9890-objs := tfa9890.o
-#end
 
 obj-$(CONFIG_SND_SOC_88PM860X)	+= snd-soc-88pm860x.o
 obj-$(CONFIG_SND_SOC_AB8500_CODEC)	+= snd-soc-ab8500-codec.o
@@ -162,7 +158,6 @@ obj-$(CONFIG_SND_SOC_AK4535)	+= snd-soc-ak4535.o
 obj-$(CONFIG_SND_SOC_AK4641)	+= snd-soc-ak4641.o
 obj-$(CONFIG_SND_SOC_AK4642)	+= snd-soc-ak4642.o
 obj-$(CONFIG_SND_SOC_AK4671)	+= snd-soc-ak4671.o
-obj-$(CONFIG_SND_SOC_AK4961)	+= snd-soc-ak4961.o
 obj-$(CONFIG_SND_SOC_AK5386)	+= snd-soc-ak5386.o
 obj-$(CONFIG_SND_SOC_AK4375)	+= snd-soc-ak4375.o
 obj-$(CONFIG_SND_SOC_ALC5623)    += snd-soc-alc5623.o
@@ -281,6 +276,3 @@ obj-$(CONFIG_SND_SOC_MSM_STUB)  += snd-soc-msm-stub.o
 # Amp
 obj-$(CONFIG_SND_SOC_MAX9877)	+= snd-soc-max9877.o
 obj-$(CONFIG_SND_SOC_TPA6130A2)	+= snd-soc-tpa6130a2.o
-#add by wuzehui
-obj-$(CONFIG_SND_SOC_TFA9890)   += snd-soc-tfa9890.o
-#endif

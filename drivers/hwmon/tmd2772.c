@@ -2180,11 +2180,7 @@ static int taos_prox_threshold_set(void)//iVIZM
 // driver init
 static int __init taos_init(void)
 {
-#ifdef CONFIG_ZTEMT_SENSORS_ALS_PS_AUTO_DETECT
-    return 0;
-#else
     return i2c_add_driver(&tmd2772_driver);
-#endif
 }
 
 // driver exit

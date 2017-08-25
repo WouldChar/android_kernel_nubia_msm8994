@@ -863,7 +863,5 @@ config SENSORS_ISL29044A
 	help
 	 This option enables support for the INTERSIL ISL29044A P/L sensor.
 
-source "drivers/input/misc/fpc1020/Kconfig"
-
 endif
 

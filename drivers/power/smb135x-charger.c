@@ -37,7 +37,6 @@ module_param_named(debug_mask_smb1357, debug_mask_smb1357, int, S_IRUSR | S_IWUS
 
 #ifdef CONFIG_ZTEMT_MSM8994_CHARGER
 #define  DEBUG
-//打开调试接口
 //#undef pr_debug
 //#define pr_debug   pr_info
 #undef KERN_INFO

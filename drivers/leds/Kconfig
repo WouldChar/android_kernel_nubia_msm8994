@@ -305,6 +305,7 @@ config LEDS_QPNP_PMI
 	  includes RGB Leds, WLED and Flash Led.
 	  To compile this driver as a module, choose M here: the module will
 	  be called leds-qpnp.
+
 config LEDS_QPNP_FLASH
 	tristate "Support for QPNP Flash LEDs"
 	depends on SPMI && OF_SPMI
@@ -540,6 +541,7 @@ config ZTEMT_RGB_BREATH_LEDS
 	help
 	  This option enables support for the ZTEMT RGB LED connected
 	  Say Y to enable support for the ZTEMT LED.
+
 config ZTEMT_LED_DEBUG
 	tristate "LED support for ZTEMT BREATH LED DEBUG"
 	depends on LEDS_CLASS

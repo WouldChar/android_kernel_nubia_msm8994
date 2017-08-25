@@ -207,13 +207,9 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 		pr_warn("%s: Panel reset failed. rc=%d\n", __func__, ret);
 		ret = 0;
 	}
-	
-#ifdef CONFIG_ZTEMT_LCD_1080P_R63315_SHARP_IPS_5P0
-		mdelay(15);
-#elif defined CONFIG_ZTEMT_MIPI_1080P_R63417_SHARP_IPS_5P5
-		mdelay(10);
+#ifdef CONFIG_ZTEMT_MIPI_1080P_R63417_SHARP_IPS_5P5
+	mdelay(10);
 #endif
-	
 	if (mdss_dsi_pinctrl_set_state(ctrl_pdata, false))
 		pr_debug("reset disable: pinctrl not enabled\n");
 
@@ -225,8 +221,6 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 		/* Add delay recommended by panel specs */
 #ifdef CONFIG_ZTEMT_MIPI_1080P_R63417_SHARP_IPS_5P5
 		mdelay(10);
-#elif defined CONFIG_ZTEMT_LCD_1080P_R63315_SHARP_IPS_5P0
-		mdelay(70);
 #else
 		udelay(2000);
 #endif
@@ -238,10 +232,6 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 	if (ret)
 		pr_err("%s: failed to disable vregs for %s\n",
 			__func__, __mdss_dsi_pm_name(DSI_PANEL_PM));
-
-#ifdef CONFIG_ZTEMT_LCD_1080P_R63315_SHARP_IPS_5P0
-		mdelay(10);
-#endif
 
 end:
 	return ret;
@@ -268,10 +258,8 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 			__func__, __mdss_dsi_pm_name(DSI_PANEL_PM));
 		return ret;
 	}
-#ifdef CONFIG_ZTEMT_LCD_1080P_R63315_SHARP_IPS_5P0
-		mdelay(40);
-#elif defined CONFIG_ZTEMT_MIPI_1080P_R63417_SHARP_IPS_5P5
-		mdelay(10);
+#ifdef CONFIG_ZTEMT_MIPI_1080P_R63417_SHARP_IPS_5P5
+	mdelay(10);
 #endif
 	if (ctrl_pdata->panel_bias_vreg) {
 		pr_debug("%s: Enable panel bias vreg. ndx = %d\n",
@@ -279,9 +267,7 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 		if (mdss_dsi_labibb_vreg_ctrl(ctrl_pdata, true))
 			pr_err("Unable to configure bias vreg\n");
 		/* Add delay recommended by panel specs */
-#ifdef CONFIG_ZTEMT_LCD_1080P_R63315_SHARP_IPS_5P0
-		mdelay(50);
-#elif defined CONFIG_ZTEMT_MIPI_1080P_R63417_SHARP_IPS_5P5
+#ifdef CONFIG_ZTEMT_MIPI_1080P_R63417_SHARP_IPS_5P5
 		mdelay(10);
 #else
 		udelay(2000);

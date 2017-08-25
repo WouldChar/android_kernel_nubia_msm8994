@@ -105,9 +105,6 @@ static int msm8994_spk_control = 1;
 static int msm_slim_0_rx_ch = 1;
 static int msm_slim_0_tx_ch = 1;
 static int msm_vi_feed_tx_ch = 2;
-#ifdef CONFIG_HEADPHONE_SWITCH
-static int headphone_switch_gpio = -1;
-#endif
 
 static int msm_btsco_rate = SAMPLING_RATE_8KHZ;
 static int msm_hdmi_rx_ch = 2;
@@ -147,9 +144,6 @@ static struct audio_plug_dev *apq8094_db_ext_fp_out_dev;
 static const char *const pin_states[] = {"sleep", "auxpcm-active",
 					 "mi2s-active", "active"};
 static const char *const spk_function[] = {"Off", "On"};
-#ifdef CONFIG_HEADPHONE_SWITCH
-static const char *const headphone_switch_text[] = {"Off", "On"};
-#endif
 static const char *const slim0_rx_ch_text[] = {"One", "Two"};
 static const char *const vi_feed_ch_text[] = {"One", "Two"};
 static const char *const slim0_tx_ch_text[] = {"One", "Two", "Three", "Four",
@@ -239,39 +233,6 @@ static struct afe_clk_cfg mi2s_tx_clk = {
 	Q6AFE_LPASS_MODE_CLK1_VALID,
 	0,
 };
-#endif
-
-#ifdef CONFIG_HEADPHONE_SWITCH
-static int headphone_switch_gpio_get(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-
-    if(headphone_switch_gpio >=0) {
-        printk("headphone_switch_gpio_get gpio value is %d\n",gpio_get_value(headphone_switch_gpio));
-        ucontrol->value.integer.value[0] = gpio_get_value(headphone_switch_gpio);
-    }
-    return 0;
-}
-
-static int headphone_switch_gpio_put(struct snd_kcontrol *kcontrol,
-        struct snd_ctl_elem_value *ucontrol)
-{
-    switch (ucontrol->value.integer.value[0]) {
-        case 1:
-            if(headphone_switch_gpio >=0) {
-                gpio_direction_output(headphone_switch_gpio,1);
-                printk("headphone_switch_gpio_put gpio value is %d\n",gpio_get_value(headphone_switch_gpio));
-            }
-            break;
-        default:
-            if(headphone_switch_gpio >=0) {
-                gpio_direction_output(headphone_switch_gpio,0);
-                printk("headphone_switch_gpio_put gpio value is %d\n",gpio_get_value(headphone_switch_gpio));
-            }
-            break;
-    }
-    return 0;
-}
 #endif
 
 static inline int param_is_mask(int p)
@@ -1991,9 +1952,6 @@ static const struct soc_enum msm_snd_enum[] = {
 	SOC_ENUM_SINGLE_EXT(8, proxy_rx_ch_text),
 	SOC_ENUM_SINGLE_EXT(3, hdmi_rx_sample_rate_text),
 	SOC_ENUM_SINGLE_EXT(2, vi_feed_ch_text),
-#ifdef CONFIG_HEADPHONE_SWITCH
-	SOC_ENUM_SINGLE_EXT(2, headphone_switch_text),
-#endif
 };
 
 static const struct snd_kcontrol_new msm_snd_controls[] = {
@@ -2030,10 +1988,6 @@ static const struct snd_kcontrol_new msm_snd_controls[] = {
 	        ak4375_mi2s_bit_format_get, ak4375_mi2s_bit_format_put),
 	SOC_ENUM_EXT("AK4375_MI2S SampleRate", msm_snd_enum[5],
 	        ak4375_mi2s_sample_rate_get, ak4375_mi2s_sample_rate_put),
-#endif
-#ifdef CONFIG_HEADPHONE_SWITCH
-	SOC_ENUM_EXT("Headphone Switch",msm_snd_enum[9],
-			headphone_switch_gpio_get, headphone_switch_gpio_put),
 #endif
 };
 
@@ -3842,22 +3796,6 @@ static int msm8994_asoc_machine_probe(struct platform_device *pdev)
 			"qcom,us-euro-gpios", pdata->us_euro_gpio);
 		mbhc_cfg.swap_gnd_mic = msm8994_swap_gnd_mic;
 	}
-
-#ifdef CONFIG_HEADPHONE_SWITCH
-    headphone_switch_gpio = of_get_named_gpio(pdev->dev.of_node,"qcom,headphone-switch-gpio", 0);
-    if (ext_us_amp_gpio >= 0) {
-        ret = gpio_request(headphone_switch_gpio, "headphone_gpio");
-        if (ret) {
-            pr_err("%s: headphone_switch_gpio request failed, ret:%d\n",
-                    __func__, ret);
-        } else {
-            gpio_direction_output(headphone_switch_gpio, 0);
-            printk("headphone_switch_gpio is default value %d\n",gpio_get_value(headphone_switch_gpio));
-        }
-    } else {
-        pr_err("qcom,headphone-switch-gpio has no .........\n");
-    }
-#endif
 
 	ret = msm8994_prepare_us_euro(card);
 	if (ret)

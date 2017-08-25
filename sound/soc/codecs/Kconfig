@@ -203,14 +203,12 @@ config SND_SOC_AK4642
 config SND_SOC_AK4671
 	tristate
 
-config SND_SOC_AK4961
-	tristate
-
 config SND_SOC_AK5386
 	tristate
 
 config SND_SOC_ALC5623
-       tristate
+	tristate
+
 config SND_SOC_ALC5632
 	tristate
 
@@ -364,19 +362,17 @@ config SND_SOC_WCD9310
 config SND_SOC_WCD9320
         tristate
 
-config SND_SOC_TFA9890
-	tristate "SND_SOC_TFA9890"
-
 config SND_SOC_WCD9306
         tristate
 
 config SND_SOC_WCD9330
         tristate
 
-#start by zmwu        
+# start by zmwu      
 config SND_SOC_AK4375
         tristate "SND_SOC_AK4375"
-#end by zmwu        
+# end by zmwu
+    
 config SND_SOC_WCD9XXX
 	tristate
 	default y if SND_SOC_WCD9320=y || SND_SOC_WCD9306=y || SND_SOC_WCD9330=y
