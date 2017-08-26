@@ -1577,6 +1577,37 @@ config SENSORS_MC13783_ADC
         help
           Support for the A/D converter on MC13783 and MC13892 PMIC.
 
+# ZTEMT SENROS START
+menuconfig ZTEMT_SENSORS
+	tristate "ZTEMT ZTEMT_SENSORS"
+	default n
+
+if ZTEMT_SENSORS
+
+config FEATURE_ZTEMT_SENSORS_LOG_ON
+	tristate "ZTEMT SENSORS LOG ON"
+	default n
+	help
+	  If you want to enable the sensor log,
+	  then choose this config
+
+config ZTEMT_SENSORS_ALS_PS_TMD2772
+	tristate "TMD2772 device driver for ZTEMT ALS and PS"
+	default n
+	help
+	  If you say yes here you get support for AMS's
+	  als ps TMD2772
+
+config ZTEMT_SENSORS_HALL_DEVICE_PAIR_OUT
+	tristate "pair out hell device driver for ZTEMT HALL DEVICE"
+	default n
+	help
+	  If you say yes here you get support for zte's
+	  pair out hell device
+
+endif
+# ZTEMT SENROS END
+
 if ACPI
 
 comment "ACPI drivers"

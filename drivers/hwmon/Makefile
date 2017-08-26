@@ -145,6 +145,10 @@ obj-$(CONFIG_SENSORS_EPM_ADC)	+= epm_adc.o
 obj-$(CONFIG_SENSORS_QPNP_ADC_VOLTAGE)	+= qpnp-adc-voltage.o qpnp-adc-common.o
 obj-$(CONFIG_SENSORS_QPNP_ADC_CURRENT)	+= qpnp-adc-current.o qpnp-adc-common.o
 obj-$(CONFIG_SENSORS_BOOST_DYNAMIC_CONTROLLER)	+= boost-dynamic-controller.o
+# ZTEMT SENROS START
+obj-$(CONFIG_ZTEMT_SENSORS_ALS_PS_TMD2772)	+= tmd2772.o
+obj-$(CONFIG_ZTEMT_SENSORS_HALL_DEVICE_PAIR_OUT)  += hall_pair_out.o
+# ZTEMT SENROS END
 
 obj-$(CONFIG_PMBUS)		+= pmbus/
 
