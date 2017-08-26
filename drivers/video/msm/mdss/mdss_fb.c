@@ -1328,6 +1328,12 @@ static void mdss_fb_scale_bl(struct msm_fb_data_type *mfd, u32 *bl_lvl)
 	(*bl_lvl) = temp;
 }
 
+#ifdef CONFIG_MACH_ZTEMT_MSM8994
+//ZTEMT: fuyipeng added for camera control backlight -----start
+struct msm_fb_data_type *zte_camera_mfd;
+//ZTEMT: fuyipeng added for camera control backlight -----end
+#endif
+
 /* must call this function from within mfd->bl_lock */
 void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 {
@@ -1346,6 +1352,12 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 	} else {
 		mfd->unset_bl_level = 0;
 	}
+
+#ifdef CONFIG_MACH_ZTEMT_MSM8994
+      //ZTEMT: fuyipeng added for camera control backlight -----start
+      zte_camera_mfd = mfd;
+      //ZTEMT: fuyipeng added for camera control backlight -----end
+#endif
 
 	pdata = dev_get_platdata(&mfd->pdev->dev);
 
@@ -1406,6 +1418,11 @@ void mdss_fb_update_backlight(struct msm_fb_data_type *mfd)
 			pdata->set_backlight(pdata, temp);
 			mfd->bl_level_scaled = mfd->unset_bl_level;
 			mfd->bl_updated = 1;
+#ifdef CONFIG_MACH_ZTEMT_MSM8994
+			//ZTEMT: fuyipeng added for camera control backlight -----start
+			zte_camera_mfd = mfd;
+			//ZTEMT: fuyipeng added for camera control backlight -----end
+#endif
 		}
 	}
 	mutex_unlock(&mfd->bl_lock);

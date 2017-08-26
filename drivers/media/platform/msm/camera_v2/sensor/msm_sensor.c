@@ -18,6 +18,14 @@
 #include <linux/regulator/rpm-smd-regulator.h>
 #include <linux/regulator/consumer.h>
 
+#ifdef CONFIG_MACH_ZTEMT_MSM8994
+// ZTEMT: fuyipeng add for setBacklight -----start
+#include "../../../../../../video/msm/mdss/mdss_fb.h"
+extern struct msm_fb_data_type *zte_camera_mfd;
+static int pre_bl_level = 0;
+// ZTEMT: fuyipeng add for setBacklight -----end
+#endif
+
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
@@ -549,6 +557,35 @@ int msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 			sensor_name);
 		return -EINVAL;
 	}
+#ifdef CONFIG_IMX234_AF
+	if (!strncmp(s_ctrl->sensordata->sensor_name, "imx234_af", 32)) {
+		uint16_t times = 2;
+		rc = sensor_i2c_client->i2c_func_tbl->i2c_write(
+			sensor_i2c_client, 0x0A02, 0x1F, MSM_CAMERA_I2C_BYTE_DATA);
+		msleep(1);
+		if (rc < 0)
+			pr_err("%s write OTP error %d\n", __func__, __LINE__);
+		rc = sensor_i2c_client->i2c_func_tbl->i2c_write(
+			sensor_i2c_client, 0x0A00, 0x01, MSM_CAMERA_I2C_BYTE_DATA);
+		msleep(1);
+		if (rc < 0)
+			pr_err("%s write OTP error %d\n", __func__, __LINE__);
+		while (chipid != 0x01) {
+			rc = sensor_i2c_client->i2c_func_tbl->i2c_read(
+				sensor_i2c_client, 0x0A01,
+				&chipid, MSM_CAMERA_I2C_WORD_DATA);
+			if (rc < 0)
+				pr_err("%s read OTP error %d\n", __func__, __LINE__);
+			chipid &= 0x1;
+			pr_err("%s imx234 OTP status=%d\n",__func__, chipid);
+			times--;
+			if (times == 0) {
+				pr_err("%s imx234 OTP status error\n",__func__);
+				break;
+			}
+		}
+	}
+#endif
 
 	rc = sensor_i2c_client->i2c_func_tbl->i2c_read(
 		sensor_i2c_client, slave_info->sensor_id_reg_addr,
@@ -557,7 +594,19 @@ int msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 		pr_err("%s: %s: read id failed\n", __func__, sensor_name);
 		return rc;
 	}
+#ifdef CONFIG_IMX234_AF
+	if (!strncmp(s_ctrl->sensordata->sensor_name, "imx234_af", 32)) {
+		chipid >>=4;
+		printk("k_debug IMX234 AF module go to imx234 = %x\n",chipid);
+	}
+#endif
 
+#ifdef CONFIG_IMX179
+	if (!strncmp(s_ctrl->sensordata->sensor_name, "imx179", 32))
+		chipid >>=8;
+	printk("%s:k_debug read id: 0x%x expected id 0x%x:\n", __func__, chipid,
+		slave_info->sensor_id);
+#endif
 	CDBG("%s: read id: 0x%x expected id 0x%x:\n", __func__, chipid,
 		slave_info->sensor_id);
 	if (msm_sensor_id_by_mask(s_ctrl, chipid) != slave_info->sensor_id) {
@@ -663,6 +712,37 @@ long msm_sensor_subdev_fops_ioctl(struct file *file,
 	return video_usercopy(file, cmd, arg, msm_sensor_subdev_do_ioctl);
 }
 
+#ifdef CONFIG_MACH_ZTEMT_MSM8994
+// ZTEMT: fuyipeng add for setBacklight -----start
+static void zte_camera_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
+{
+	struct mdss_panel_data *pdata;
+	
+	if (NULL == mfd) {
+		pr_err("zte_camera_backlight mfd = NULL!\n");
+		return;
+	}
+
+	pdata = dev_get_platdata(&mfd->pdev->dev);	
+	if (NULL == pdata) {
+		pr_err("zte_camera_backlight pdata = NULL!\n");
+		return;
+      	}
+	
+	printk("%s bl_max=%d bl_level=%d in \n", __func__, pdata->panel_info.bl_max, mfd->bl_level);
+
+	if (0 == bkl_lvl && mfd->bl_level != 0) {
+		pre_bl_level = mfd->bl_level;
+		pdata->set_backlight(pdata, 0);
+	} else if (1 == bkl_lvl && pre_bl_level != 0) {
+		pdata->set_backlight(pdata, pre_bl_level);
+		pre_bl_level = 0;
+	}
+	
+}
+// ZTEMT: fuyipeng add for setBacklight -----end
+#endif
+
 static int msm_sensor_config32(struct msm_sensor_ctrl_t *s_ctrl,
 	void __user *argp)
 {
@@ -708,6 +788,20 @@ static int msm_sensor_config32(struct msm_sensor_ctrl_t *s_ctrl,
 			cdata->cfg.sensor_info.sensor_mount_angle);
 
 		break;
+#ifdef CONFIG_MACH_ZTEMT_MSM8994
+	// ZTEMT: fuyipeng add for setBacklight -----start
+	case CFG_SET_ZTE_BACKLIGHT: {
+        	int32_t level = 0;
+        	if (copy_from_user(&level, (void *)compat_ptr(cdata->cfg.setting),
+			sizeof(int32_t))) {
+			pr_err("%s:%d failed\n", __func__, __LINE__);
+			break;
+		}
+		zte_camera_backlight(zte_camera_mfd, level);
+		break;
+	}
+	// ZTEMT: fuyipeng add for setBacklight -----end
+#endif
 	case CFG_GET_SENSOR_INIT_PARAMS:
 		cdata->cfg.sensor_init_params.modes_supported =
 			s_ctrl->sensordata->sensor_info->modes_supported;
