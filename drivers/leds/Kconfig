@@ -534,22 +534,6 @@ config LEDS_AW2013
 	  This option enables support for the AW2013 RGB LED connected
 	  through I2C. Say Y to enable support for the AW2013 LED.
 
-config ZTEMT_RGB_BREATH_LEDS
-	tristate "LED support for ZTEMT BREATH LED"
-	depends on LEDS_CLASS
-	default y
-	help
-	  This option enables support for the ZTEMT RGB LED connected
-	  Say Y to enable support for the ZTEMT LED.
-
-config ZTEMT_LED_DEBUG
-	tristate "LED support for ZTEMT BREATH LED DEBUG"
-	depends on LEDS_CLASS
-	default y
-	help
-	  This option enables support for the ZTEMT RGB LED DEBUG
-	  Say Y to enable support for the ZTEMT LED.
-
 config ZTEMT_BREATH_LEDS
 	tristate "LED support for ZTEMT BREATH LED"
 	depends on LEDS_CLASS
