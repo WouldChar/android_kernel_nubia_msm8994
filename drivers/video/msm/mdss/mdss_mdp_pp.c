@@ -3065,6 +3065,33 @@ static int pp_read_argc_lut_cached(struct mdp_pgc_lut_data *config)
 	return 0;
 }
 
+#ifdef CONFIG_ZTEMT_LCD_DISP_ENHANCE
+/* lcd color tmp adjust */
+int zte_mdss_pcc_config(struct mdp_pcc_cfg_data *config)
+{
+	int ret = 0;
+	u32 disp_num=0;
+
+	if ((config->block < MDP_LOGICAL_BLOCK_DISP_0) ||
+		(config->block >= MDP_BLOCK_MAX))
+		return -EINVAL;
+
+	if ((config->ops & MDSS_PP_SPLIT_MASK) == MDSS_PP_SPLIT_MASK) {
+		pr_warn("Can't set both split bits\n");
+		return -EINVAL;
+	}
+
+	mutex_lock(&mdss_pp_mutex);
+	disp_num = config->block - MDP_LOGICAL_BLOCK_DISP_0;
+	if (mdss_pp_res) {
+		mdss_pp_res->pcc_disp_cfg[disp_num] = *config;
+		mdss_pp_res->pp_disp_flags[disp_num] |= PP_FLAGS_DIRTY_PCC;
+	}
+	mutex_unlock(&mdss_pp_mutex);
+	return ret;
+}
+#endif
+
 /* Note: Assumes that its inputs have been checked by calling function */
 static void pp_update_hist_lut(char __iomem *addr,
 				struct mdp_hist_lut_data *cfg)

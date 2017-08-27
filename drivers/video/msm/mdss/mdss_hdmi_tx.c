@@ -719,6 +719,11 @@ static ssize_t hdmi_tx_sysfs_wta_hpd(struct device *dev,
 	    (!hdmi_ctrl->mhl_hpd_on || hdmi_ctrl->hpd_feature_on))
 		return 0;
 
+#ifdef CONFIG_ZTEMT_MHL_POWER
+	if (!is_mhl_connected)
+		return 0;
+#endif
+
 	switch (hpd) {
 	case HPD_OFF:
 	case HPD_DISABLE:

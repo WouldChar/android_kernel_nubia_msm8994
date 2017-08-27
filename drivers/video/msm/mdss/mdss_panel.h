@@ -476,6 +476,11 @@ struct mdss_panel_info {
 	bool is_split_display;
 
 	bool is_prim_panel;
+#ifdef CONFIG_ZTEMT_LCD_DISP_ENHANCE
+	/*dimming*/
+	bool disable_dimming_when_suspend;
+	bool disable_dimming_when_resume;
+#endif
 
 	/* refer sim_panel_modes enum for different modes */
 	u8 sim_panel_mode;
