@@ -77,7 +77,11 @@ module_param(override_phy_init, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(override_phy_init, "Override HSPHY Init Seq");
 
 /* Enable Proprietary charger detection */
+#ifdef CONFIG_ZTEMT_MSM8994_CHARGER
+static bool prop_chg_detect = 1;
+#else
 static bool prop_chg_detect;
+#endif
 module_param(prop_chg_detect, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(prop_chg_detect, "Enable Proprietary charger detection");
 
@@ -211,6 +215,9 @@ struct dwc3_msm {
 	bool			rm_pulldown;
 	enum dwc3_id_state	id_state;
 	unsigned long		lpm_flags;
+#ifdef CONFIG_ZTEMT_MSM8994_CHARGER
+	struct power_supply	*batt_psy;
+#endif
 #define MDWC3_PHY_REF_CLK_OFF		BIT(0)
 #define MDWC3_TCXO_SHUTDOWN		BIT(1)
 #define MDWC3_ASYNC_IRQ_WAKE_CAPABILITY	BIT(2)
@@ -2265,6 +2272,31 @@ get_prop_usbin_voltage_now(struct dwc3_msm *mdwc)
 	}
 }
 
+#ifdef CONFIG_ZTEMT_MSM8994_CHARGER
+static int get_prop_is_usb_present(struct dwc3_msm *mdwc)
+{
+	union power_supply_propval ret = { 0, };
+	int rc;
+
+	if (!mdwc->batt_psy)
+		mdwc->batt_psy = power_supply_get_by_name("battery");
+
+	if (!mdwc->batt_psy) {
+		pr_err("%s: Unable to get battery power_supply\n", __func__);
+		return 0;
+	}
+
+	rc = mdwc->batt_psy->get_property(mdwc->batt_psy,
+					POWER_SUPPLY_PROP_USB_PRESENT, &ret);
+	if (rc < 0) {
+		pr_err("could not read USB Present, rc=%d\n",rc);
+		return 0;
+	}
+
+	return ret.intval;
+}
+#endif
+
 static int dwc3_msm_power_get_property_usb(struct power_supply *psy,
 				  enum power_supply_property psp,
 				  union power_supply_propval *val)
@@ -2281,12 +2313,24 @@ static int dwc3_msm_power_get_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
 		val->intval = mdwc->current_max;
 		break;
+/* CONFIG_ZTEMT_MSM8994_CHARGER
+ * online-Sometime Is Wrong !!!
+ */
+#ifdef CONFIG_ZTEMT_MSM8994_CHARGER
+	case POWER_SUPPLY_PROP_PRESENT:
+	case POWER_SUPPLY_PROP_ONLINE:
+		val->intval = ((mdwc->vbus_active) ||
+			(mdwc->online) ||
+			get_prop_is_usb_present(mdwc));
+		break;
+#else
 	case POWER_SUPPLY_PROP_PRESENT:
 		val->intval = mdwc->vbus_active;
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
 		val->intval = mdwc->online;
 		break;
+#endif
 	case POWER_SUPPLY_PROP_TYPE:
 		val->intval = psy->type;
 		break;
@@ -2862,6 +2906,11 @@ unreg_chrdev:
 	return ret;
 }
 
+#ifdef CONFIG_SII8620_MHL_TX
+struct dwc3_mhl		*dwc3_mhl_n;
+struct platform_device		*dwc3_mhl_t;
+#endif
+
 static int dwc3_msm_probe(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node, *dwc3_node;
@@ -2880,6 +2929,20 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "not enough memory\n");
 		return -ENOMEM;
 	}
+
+#ifdef CONFIG_SII8620_MHL_TX
+	dwc3_mhl_n = kzalloc(sizeof(struct dwc3_mhl), GFP_KERNEL);
+	if (!dwc3_mhl_n) {
+		dev_err(&pdev->dev, "not enough memory to dwc3_mhl_n\n");
+		return -ENOMEM;
+	}
+	dwc3_mhl_t = kzalloc(sizeof(struct platform_device), GFP_KERNEL);
+	if (!dwc3_mhl_t) {
+		dev_err(&pdev->dev, "not enough memory to dwc3_mhl_t\n");
+		return -ENOMEM;
+	}
+	memcpy(&dwc3_mhl_t,&pdev,sizeof(struct platform_device));
+#endif
 
 	if (!dev->dma_mask)
 		dev->dma_mask = &dev->coherent_dma_mask;
