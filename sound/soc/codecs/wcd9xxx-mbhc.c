@@ -107,7 +107,11 @@
  * of plug type with current source
  */
 #define WCD9XXX_CS_MEAS_INVALD_RANGE_LOW_MV 160
+#ifdef CONFIG_ZTEMT_AUDIO
+#define WCD9XXX_CS_MEAS_INVALD_RANGE_HIGH_MV 180
+#else
 #define WCD9XXX_CS_MEAS_INVALD_RANGE_HIGH_MV 265
+#endif
 
 /*
  * Threshold used to detect euro headset
@@ -126,10 +130,18 @@
 /* RX_HPH_CNP_WG_TIME increases by 0.24ms */
 #define WCD9XXX_WG_TIME_FACTOR_US	240
 
+#ifdef CONFIG_ZTEMT_AUDIO
+#define WCD9XXX_V_CS_HS_MAX 2000
+#else
 #define WCD9XXX_V_CS_HS_MAX 500
+#endif
 #define WCD9XXX_V_CS_NO_MIC 5
 #define WCD9XXX_MB_MEAS_DELTA_MAX_MV 80
+#ifdef CONFIG_ZTEMT_AUDIO
+#define WCD9XXX_CS_MEAS_DELTA_MAX_MV 300
+#else
 #define WCD9XXX_CS_MEAS_DELTA_MAX_MV 12
+#endif
 
 #define WCD9XXX_ZDET_ZONE_1 80000
 #define WCD9XXX_ZDET_ZONE_2 800000
@@ -140,6 +152,10 @@
 #define WCD9XXX_IS_IN_ZDET_ZONE_3(x) (x > WCD9XXX_ZDET_ZONE_2 ? 1 : 0)
 #define WCD9XXX_BOX_CAR_AVRG_MIN 1
 #define WCD9XXX_BOX_CAR_AVRG_MAX 10
+
+#ifdef CONFIG_SND_SOC_AK4375
+static int nubia_headphone_state = 0;
+#endif
 
 static int impedance_detect_en;
 module_param(impedance_detect_en, int,
@@ -851,6 +867,9 @@ static void wcd9xxx_report_plug(struct wcd9xxx_mbhc *mbhc, int insertion,
 
 	pr_debug("%s: enter insertion %d hph_status %x\n",
 		 __func__, insertion, mbhc->hph_status);
+#ifdef CONFIG_SND_SOC_AK4375
+	nubia_headphone_state=insertion;
+#endif
 	if (!insertion) {
 		/* Report removal */
 		mbhc->hph_status &= ~jack_type;
@@ -958,11 +977,16 @@ static void wcd9xxx_report_plug(struct wcd9xxx_mbhc *mbhc, int insertion,
 		 * if PA is already on, switch micbias
 		 * source to VDDIO
 		 */
+#ifdef CONFIG_SND_SOC_AK4375
+		if ((mbhc->current_plug == PLUG_TYPE_HEADSET) ||
+		    (mbhc->current_plug == PLUG_TYPE_ANC_HEADPHONE))
+#else
 		if (((mbhc->current_plug == PLUG_TYPE_HEADSET) ||
 		     (mbhc->current_plug == PLUG_TYPE_ANC_HEADPHONE)) &&
 		    ((mbhc->event_state & (1 << MBHC_EVENT_PA_HPHL |
 			1 << MBHC_EVENT_PA_HPHR |
 			1 << MBHC_EVENT_PRE_TX_1_3_ON))))
+#endif
 			__wcd9xxx_switch_micbias(mbhc, 1, false,
 						 false);
 		wcd9xxx_clr_and_turnon_hph_padac(mbhc);
@@ -1492,6 +1516,10 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 		} else
 			d->_type = PLUG_TYPE_HEADSET;
 
+#ifdef CONFIG_ZTEMT_AUDIO
+		pr_debug("%s:d->mic_bias %d,dce_z %d, mb_mv %d, no_mic %d, hs_max %d,\n",
+			 __func__, d->mic_bias, dce_z, mb_mv, no_mic, hs_max);
+#endif
 		pr_debug("%s: DCE #%d, %04x, V %04d(%04d), HPHL %d TYPE %d\n",
 			 __func__, i, d->dce, vdce, d->_vdces,
 			 d->hphl_status & 0x01,
@@ -3440,6 +3468,8 @@ static irqreturn_t wcd9xxx_mech_plug_detect_irq(int irq, void *data)
 	return r;
 }
 
+#ifdef CONFIG_ZTEMT_AUDIO
+#else
 static int wcd9xxx_is_false_press(struct wcd9xxx_mbhc *mbhc)
 {
 	s16 mb_v;
@@ -3485,6 +3515,7 @@ static int wcd9xxx_is_false_press(struct wcd9xxx_mbhc *mbhc)
 
 	return r;
 }
+#endif
 
 /* called under codec_resource_lock acquisition */
 static int wcd9xxx_determine_button(const struct wcd9xxx_mbhc *mbhc,
@@ -3862,10 +3893,13 @@ static irqreturn_t wcd9xxx_release_handler(int irq, void *data)
 			wcd9xxx_jack_report(mbhc, &mbhc->button_jack, 0,
 					    mbhc->buttons_pressed);
 		} else {
+#ifdef CONFIG_ZTEMT_AUDIO
+#else
 			if (wcd9xxx_is_false_press(mbhc)) {
 				pr_debug("%s: Fake button press interrupt\n",
 					 __func__);
 			} else {
+#endif
 				if (mbhc->in_swch_irq_handler) {
 					pr_debug("%s: Switch irq kicked in, ignore\n",
 						 __func__);
@@ -3883,7 +3917,10 @@ static irqreturn_t wcd9xxx_release_handler(int irq, void *data)
 						      0, mbhc->buttons_pressed);
 					waitdebounce = false;
 				}
+#ifdef CONFIG_ZTEMT_AUDIO
+#else
 			}
+#endif
 		}
 
 		mbhc->buttons_pressed &= ~WCD9XXX_JACK_BUTTON_MASK;
@@ -4810,7 +4847,12 @@ static int wcd9xxx_event_notify(struct notifier_block *self, unsigned long val,
 	case WCD9XXX_EVENT_PRE_MICBIAS_4_ON:
 		if (mbhc->mbhc_cfg && mbhc->mbhc_cfg->micbias ==
 		    wcd9xxx_event_to_micbias(event)) {
+#ifdef CONFIG_SND_SOC_AK4375
+			__wcd9xxx_switch_micbias(mbhc, 1, false,
+						 false);
+#else
 			wcd9xxx_switch_micbias(mbhc, 0);
+#endif
 			/*
 			 * Enable MBHC TxFE whenever  micbias is
 			 * turned ON and polling is active
@@ -4888,7 +4930,18 @@ static int wcd9xxx_event_notify(struct notifier_block *self, unsigned long val,
 		if (!(mbhc->event_state &
 		      (1 << MBHC_EVENT_PA_HPHL | 1 << MBHC_EVENT_PA_HPHR |
 		       1 << MBHC_EVENT_PRE_TX_1_3_ON)))
+#ifdef CONFIG_SND_SOC_AK4375
+			pr_debug("%s:  nubia_headphone_state=%d\n",
+				 __func__, nubia_headphone_state );
+
+		if (nubia_headphone_state == 1)
+			__wcd9xxx_switch_micbias(mbhc, 1, false,
+						 false);
+		else
+			wcd9xxx_switch_micbias(mbhc, 0);   
+#else
 			wcd9xxx_switch_micbias(mbhc, 0);
+#endif
 		break;
 	/* Clock usage change */
 	case WCD9XXX_EVENT_PRE_MCLK_ON:
