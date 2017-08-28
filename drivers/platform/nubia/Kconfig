@@ -1,0 +1,17 @@
+# ZTEMT/Nubia configuration options
+
+config MACH_ZTEMT_MSM8994
+	bool "ZTEMT MSM8994"
+	depends on ARCH_MSM8994
+	help
+	  Support for ZTEMT MSM8994 variants
+
+choice
+	prompt "Nubia board selection"
+
+	config MACH_ZTEMT_NX510J
+		bool "ZTEMT_NX510J board"
+		select MACH_ZTEMT_MSM8994
+		help
+		  Support for ZTEMT Nubia NX510J variant
+endchoice
