@@ -45,6 +45,11 @@
 #include "ion.h"
 #include "ion_priv.h"
 #include "compat_ion.h"
+//ZTEMT:wangkai add for release memory-----Start
+#ifdef CONFIG_MACH_ZTEMT_MSM8994
+#define DEBUG_HEAP_SHRINKER
+#endif
+//ZTEMT:wangkai add for release memory-----End
 
 /**
  * struct ion_device - the metadata of the ion device node
@@ -1966,7 +1971,11 @@ void ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 
 		snprintf(debug_name, 64, "%s_shrink", heap->name);
 		debug_file = debugfs_create_file(
+#ifdef CONFIG_MACH_ZTEMT_MSM8994
+			debug_name, 0666, dev->heaps_debug_root, heap,
+#else
 			debug_name, 0644, dev->heaps_debug_root, heap,
+#endif
 			&debug_shrink_fops);
 		if (!debug_file) {
 			char buf[256], *path;
