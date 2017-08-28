@@ -793,6 +793,9 @@ bool is_cma_pageblock(struct page *page)
 {
 	return get_pageblock_migratetype(page) == MIGRATE_CMA;
 }
+#ifdef CONFIG_MACH_ZTEMT_MSM8994
+EXPORT_SYMBOL(is_cma_pageblock);	//ZTEMT: For Tuxera exfat
+#endif
 
 /* Free whole pageblock and set it's migration type to MIGRATE_CMA. */
 void __init init_cma_reserved_pageblock(struct page *page)
