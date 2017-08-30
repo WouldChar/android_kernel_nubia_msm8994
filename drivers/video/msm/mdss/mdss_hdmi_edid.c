@@ -1696,7 +1696,10 @@ int hdmi_edid_read(void *input)
 	u32 cea_extension_ver = 0;
 	u32 num_of_cea_blocks = 0;
 	u32 ieee_reg_id = 0;
+#ifdef CONFIG_SII8620_MHL_TX
+#else
 	u32 i = 1;
+#endif
 	int status = 0;
 	char vendor_id[5];
 	struct hdmi_edid_ctrl *edid_ctrl = (struct hdmi_edid_ctrl *)input;
@@ -1784,9 +1787,9 @@ int hdmi_edid_read(void *input)
 	case 2:
 	case 3:
 	case 4:
-		for (i = 1; i <= num_of_cea_blocks; i++) {
 #ifdef CONFIG_SII8620_MHL_TX
 #else
+		for (i = 1; i <= num_of_cea_blocks; i++) {
 			status = hdmi_edid_read_block(
 				edid_ctrl, i, edid_buf + (0x80 * i));
 			if (status) {
@@ -1794,9 +1797,9 @@ int hdmi_edid_read(void *input)
 					__func__, i, status);
 				goto error;
 			}
-#endif
 		}
 		break;
+#endif
 	default:
 		DEV_ERR("%s: ddc read failed, not supported multi-blocks: %d\n",
 			__func__, num_of_cea_blocks);
