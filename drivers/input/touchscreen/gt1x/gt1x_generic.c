@@ -708,9 +708,9 @@ s32 gt1x_init_panel(void)
 void gt1x_select_addr(void)
 {
 	GTP_GPIO_OUTPUT(GTP_RST_PORT, 0);
-	msleep(2);
+	mdelay(2);//msleep(2);
 	GTP_GPIO_OUTPUT(GTP_INT_PORT, gt1x_i2c_client->addr == 0x14);
-	msleep(2);
+	mdelay(2);//msleep(2);
 	GTP_GPIO_OUTPUT(GTP_RST_PORT, 1);
 }
 
@@ -722,7 +722,7 @@ s32 gt1x_reset_guitar(void)
 
 	/* select i2c address */
 	gt1x_select_addr();
-	msleep(10);		//must >= 6ms
+	mdelay(10);//msleep(10);		//must >= 6ms
 
 	/* int synchronization */
 	if (CHIP_TYPE_GT2X == gt1x_chip_type) {
@@ -1102,16 +1102,16 @@ s32 gt1x_touch_event_handler(u8 * data, struct input_dev * dev, struct input_dev
 	s32 i = 0;
 	s32 ret = -1;
 /*** ZTEMT start ,add palm sleep***/
-    u8 finger = 0;
+	u8 finger = 0;
 /*** ZTEMT end***/
 
 	GTP_DEBUG_FUNC();
 /*** ZTEMT start ,add palm sleep***/
-    finger = data[0];
-    if((finger & 0x40) == 0x40){
+	finger = data[0];
+	if ((finger & 0x40) == 0x40) {
 		GTP_INFO("Have palm event.");
 
-        if(pre_index){
+		if (pre_index) {
 			#if GTP_ICS_SLOT_REPORT
 			for (i = 0; i < GTP_MAX_TOUCH; i++) {
 				if (pre_index >> i & 0x01) {
@@ -1122,13 +1122,30 @@ s32 gt1x_touch_event_handler(u8 * data, struct input_dev * dev, struct input_dev
 			gt1x_touch_up(0);
 			#endif
 
-        pre_index = 0;
-        }
-
-        input_report_abs(dev, ABS_MT_PRESSURE, 1000);
-        input_sync(dev);
+			pre_index = 0;
+		}
+		#if GTP_ICS_SLOT_REPORT
+		input_sync(dev);
+		input_mt_report_slot_state(dev, MT_TOOL_FINGER, true);
+		input_report_abs(dev,ABS_MT_POSITION_X,100);
+		input_report_abs(dev,ABS_MT_POSITION_Y,0);
+		input_report_abs(dev, ABS_MT_PRESSURE, 1000);
+		input_sync(dev);
+		input_mt_report_slot_state(dev, MT_TOOL_FINGER, false);
+		input_sync(dev);
+		#else
+		input_report_key(dev, BTN_TOUCH, 1);
+		input_report_abs(dev,ABS_MT_POSITION_X,100);
+		input_report_abs(dev,ABS_MT_POSITION_Y,0);
+		input_report_abs(dev, ABS_MT_PRESSURE, 1000);
+		input_mt_sync(dev);
+		input_sync(dev);
+		input_report_key(dev, BTN_TOUCH, 0);
+		input_mt_sync(dev);
+		input_sync(dev);
+		#endif
 		return 0;
-    }
+	}
 /*** ZTEMT end***/
 
 

@@ -89,6 +89,7 @@
 #define TAOS_ALS_GAIN_8X                1
 #define TAOS_ALS_GAIN_16X               2
 #define TAOS_ALS_GAIN_120X              3
+#define ALS_ADC_TIME_DEFAULT		    0xF0
 
 #define CAL_THRESHOLD                      "/persist/proxdata/threshold"
 #define PATH_PROX_OFFSET                   "/persist/sensors/proximity/offset/proximity_offset"
@@ -107,7 +108,8 @@
 #define PROX_DEFAULT_THRESHOLD_HIGH         800
 #define PROX_DEFAULT_THRESHOLD_LOW          700
 #define PROX_THRESHOLD_HIGH_MAX             800
-#define PROX_THRESHOLD_HIGH_MIN             500
+#define PROX_THRESHOLD_HIGH_MIN             450
+#define PROX_THRESHOLD_LOW_MIN              300
 #define PROX_DEFAULT_OFFSET_CNT              0
 #define PROX_THRESHOLD_SAFE_DISTANCE        300
 #define PROX_NEED_OFFSET_CAL_THRESHOLD      100
@@ -224,6 +226,7 @@ struct taos_data {
 	struct taos_wake_lock proximity_wakelock;
 	struct mutex lock;
 	struct mutex prox_work_lock;
+	struct mutex reg_lock;
 	struct device *class_dev;
 	struct delayed_work als_poll_work;
 	struct delayed_work prox_calibrate_work;
@@ -295,4 +298,5 @@ static void taos_prox_threshold_use_default(struct taos_cfg *p_taos_cfgp);
 static int  taos_prox_threshold_use_calibrate(struct taos_data *p_taos_data);
 static int  taos_prox_offset_cal(void);
 static void taos_prox_threshold_safe_check(void);
+static void taos_prox_uncover_data_check(void);
 #endif

@@ -336,6 +336,134 @@ void gt1x_enter_update_mode(void)
 	gt1x_irq_disable();
 }
 
+int gt1x_error_erase(void)
+{
+	int block_len = 0;
+	u16 checksum = 0;
+	u16 erase_addr = 0;
+	u8 buffer[10] = { 0 };
+	int ret = 0;
+	int wait_time = 0;
+	int burn_state = ERROR;
+	int retry = 5;
+	u8 *fw = NULL;
+
+	GTP_INFO("Erase flash area of ss51.");
+
+	gt1x_reset_guitar();
+
+	fw = gt1x_get_fw_data(update_info.firmware->subsystem[0].offset,
+		update_info.firmware->subsystem[0].length);
+	if (fw == NULL) {
+		GTP_ERROR("get isp fail");
+		return ERROR_FW;
+	}
+
+	ret = gt1x_run_ss51_isp(fw, update_info.firmware->subsystem[0].length);
+	if (ret) {
+		GTP_ERROR("run isp fail");
+		return ERROR_PATH;
+	}
+
+	fw = kmalloc(1024 * 4, GFP_KERNEL);
+	if (!fw) {
+		GTP_ERROR("error when alloc mem.");
+		return ERROR_MEM;
+	}
+
+	memset(fw, 0xFF, 1024 * 4);
+	erase_addr = 0x00;
+	block_len = 1024 * 4;
+
+	while (retry-- > 0) {
+		checksum = 0;
+		checksum += block_len;
+		checksum += erase_addr;
+		checksum += gt1x_calc_checksum(fw, block_len);
+		checksum = (0 - checksum);
+
+		buffer[0] = ((block_len >> 8) & 0xFF);
+		buffer[1] = (block_len & 0xFF);
+		buffer[2] = ((erase_addr >> 8) & 0xFF);
+		buffer[3] = (erase_addr & 0xFF);
+
+		ret = gt1x_i2c_write_with_readback(0x8100, buffer, 4);
+		if (ret) {
+			GTP_ERROR("write length & address fail!");
+			continue;
+		}
+
+		ret = gt1x_i2c_write(0x8100 + 4, fw, block_len);
+		if (ret) {
+			GTP_ERROR("write fw data fail!");
+			continue;
+		}
+
+		ret = gt1x_recall_check(fw, 0x8100 + 4, block_len);
+		if (ret) {
+			continue;
+		}
+
+		buffer[0] = ((checksum >> 8) & 0xFF);
+		buffer[1] = (checksum & 0xFF);
+		ret = gt1x_i2c_write_with_readback(0x8100 + 4 + block_len, buffer, 2);
+		if (ret) {
+			GTP_ERROR("write checksum fail!");
+			continue;
+		}
+
+		buffer[0] = 0;
+		ret = gt1x_i2c_write_with_readback(0x8022, buffer, 1);
+		if (ret) {
+			GTP_ERROR("clear control flag fail!");
+			continue;
+		}
+
+		buffer[0] = FW_SECTION_TYPE_SS51_PATCH;
+		buffer[1] = FW_SECTION_TYPE_SS51_PATCH;
+		ret = gt1x_i2c_write_with_readback(0x8020, buffer, 2);
+		if (ret) {
+			GTP_ERROR("write subsystem type fail!");
+			continue;
+		}
+
+		burn_state = ERROR;
+		wait_time = 200;
+		while (wait_time > 0) {
+			wait_time--;
+			msleep(5);
+			ret = gt1x_i2c_read_dbl_check(0x8022, buffer, 1);
+			if (ret) {
+				continue;
+			}
+
+			if (buffer[0] == 0xAA) {
+				GTP_DEBUG("burning.....");
+				continue;
+			} else if (buffer[0] == 0xDD) {
+				GTP_ERROR("checksum error!");
+				break;
+			} else if (buffer[0] == 0xBB) {
+				GTP_INFO("burning success.");
+				burn_state = 0;
+				break;
+			} else if (buffer[0] == 0xCC) {
+				GTP_ERROR("burning failed!");
+				break;
+			} else {
+				GTP_DEBUG("unknown state!(0x8022: 0x%02X)", buffer[0]);
+			}
+		}
+	}
+
+	kfree(fw);
+	if (burn_state == 0) {
+		return 0;
+	} else {
+		return ERROR_RETRY;
+	}
+}
+
 int gt1x_update_firmware(char *filename)
 {
 	int i = 0;
@@ -427,6 +555,7 @@ int gt1x_update_firmware(char *filename)
 
 		ret = gt1x_check_subsystem_in_flash(&(update_info.firmware->subsystem[i]));
 		if (ret) {
+			gt1x_error_erase();
 			break;
 		}
 		//if (ret) {

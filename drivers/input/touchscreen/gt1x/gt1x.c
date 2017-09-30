@@ -41,8 +41,13 @@ extern int ztemt_get_hw_id(void);
 
 static s32 gt1x_halt = 0;
 static struct work_struct gt1x_work;
+/* used for resume work added by nubia */
+static struct work_struct gt1x_resume_work;
+
 static struct input_dev *input_dev;
 static struct workqueue_struct *gt1x_wq;
+static struct workqueue_struct *gt1x_resume_wq;
+
 static const char *gt1x_ts_name = "goodix-ts";
 static const char *input_dev_phys = "input/ts";
 
@@ -57,6 +62,8 @@ extern u8 gt1x_wakeup_gesture;
 u8 gt1x_touch_mode = 0;
 
 /*** ZTEMT start 20141218***/
+static void gt1x_ts_resume_work_func(struct work_struct *work);
+
 #ifdef CONFIG_FB
 struct notifier_block fb_notif;
 static int fb_notifier_callback(struct notifier_block *self,
@@ -284,6 +291,11 @@ static void gt1x_ts_work_func(struct work_struct *work)
 	u8 finger = 0;
 	s32 ret = 0;
 	u8 point_data[11] = { 0 };
+
+	if (update_info.status) {
+		GTP_ERROR("Ignore interrupts during fw update.");
+		return;
+	}
 
 #if GTP_GESTURE_WAKEUP
 	if (gt1x_wakeup_gesture) {
@@ -1014,6 +1026,7 @@ static int gt1x_ts_probe(struct i2c_client *client, const struct i2c_device_id *
 	}
 
 	INIT_WORK(&gt1x_work, gt1x_ts_work_func);
+	INIT_WORK(&gt1x_resume_work, gt1x_ts_resume_work_func);
 
 	ret = gt1x_request_input_dev();
 	if (ret < 0) {
@@ -1284,6 +1297,12 @@ static int gt1x_ts_resume(struct device *dev)
 	return 0;
 }
 
+static void gt1x_ts_resume_work_func(struct work_struct *work)
+{
+	GTP_INFO("gt1x_ts_resume_work_func");
+	gt1x_ts_resume(NULL);
+}
+
 /*** ZTEMT start 20141218***/
 #if defined(CONFIG_FB)
 static int fb_notifier_callback(struct notifier_block *self,
@@ -1295,7 +1314,7 @@ static int fb_notifier_callback(struct notifier_block *self,
 	if (evdata && evdata->data && event == FB_EVENT_BLANK && gt1x_i2c_client) {
 		blank = evdata->data;
 		if (*blank == FB_BLANK_UNBLANK) {
-			gt1x_ts_resume(NULL);
+			queue_work(gt1x_resume_wq, &gt1x_resume_work);
 			GTP_INFO("ztemt %s: Wake!\n", __func__);
 		}
 		else if (*blank == FB_BLANK_POWERDOWN) {
@@ -1377,6 +1396,16 @@ static int gt1x_ts_init(void)
 		GTP_ERROR("Creat workqueue failed.");
 		return -ENOMEM;
 	}
+
+	gt1x_resume_wq = create_singlethread_workqueue("gt1x_resume_wq");
+	if (!gt1x_resume_wq) {
+		GTP_ERROR("Creat workqueue failed.");
+		if (gt1x_wq) {
+			destroy_workqueue(gt1x_wq);
+		}
+		return -ENOMEM;
+	}
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
 	early_suspend.suspend = gt1x_ts_early_suspend;
@@ -1399,6 +1428,9 @@ static void gt1x_ts_exit(void)
 	i2c_del_driver(&gt1x_ts_driver);
 	if (gt1x_wq) {
 		destroy_workqueue(gt1x_wq);
+	}
+	if (gt1x_resume_wq) {
+		destroy_workqueue(gt1x_resume_wq);
 	}
 
 	gt1x_deinit();

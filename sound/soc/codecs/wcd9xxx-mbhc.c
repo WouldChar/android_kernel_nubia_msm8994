@@ -130,18 +130,10 @@
 /* RX_HPH_CNP_WG_TIME increases by 0.24ms */
 #define WCD9XXX_WG_TIME_FACTOR_US	240
 
-#ifdef CONFIG_ZTEMT_AUDIO
-#define WCD9XXX_V_CS_HS_MAX 2000
-#else
 #define WCD9XXX_V_CS_HS_MAX 500
-#endif
 #define WCD9XXX_V_CS_NO_MIC 5
 #define WCD9XXX_MB_MEAS_DELTA_MAX_MV 80
-#ifdef CONFIG_ZTEMT_AUDIO
-#define WCD9XXX_CS_MEAS_DELTA_MAX_MV 300
-#else
 #define WCD9XXX_CS_MEAS_DELTA_MAX_MV 12
-#endif
 
 #define WCD9XXX_ZDET_ZONE_1 80000
 #define WCD9XXX_ZDET_ZONE_2 800000
@@ -1516,10 +1508,6 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 		} else
 			d->_type = PLUG_TYPE_HEADSET;
 
-#ifdef CONFIG_ZTEMT_AUDIO
-		pr_debug("%s:d->mic_bias %d,dce_z %d, mb_mv %d, no_mic %d, hs_max %d,\n",
-			 __func__, d->mic_bias, dce_z, mb_mv, no_mic, hs_max);
-#endif
 		pr_debug("%s: DCE #%d, %04x, V %04d(%04d), HPHL %d TYPE %d\n",
 			 __func__, i, d->dce, vdce, d->_vdces,
 			 d->hphl_status & 0x01,
@@ -5546,6 +5534,26 @@ int wcd9xxx_mbhc_init(struct wcd9xxx_mbhc *mbhc, struct wcd9xxx_resmgr *resmgr,
 				__func__);
 			return ret;
 		}
+
+#ifdef CONFIG_ZTEMT_AUDIO
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_1,
+				       KEY_VOLUMEUP);
+		if (ret) {
+			pr_err("%s: Failed to set code for btn-1\n",
+				__func__);
+			return ret;
+		}
+
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_2,
+				       KEY_VOLUMEDOWN);
+		if (ret) {
+			pr_err("%s: Failed to set code for btn-2\n",
+				__func__);
+			return ret;
+		}
+#endif
 
 		INIT_DELAYED_WORK(&mbhc->mbhc_firmware_dwork,
 				  wcd9xxx_mbhc_fw_read);

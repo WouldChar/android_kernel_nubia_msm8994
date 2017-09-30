@@ -1454,7 +1454,9 @@ static ssize_t attr_als_enable_store(struct device *dev,
 
 	if (value)
     {
+        mutex_lock(&chip->reg_lock);
         taos_sensors_als_poll_on();
+        mutex_unlock(&chip->reg_lock);
     }
     else
     {
@@ -1509,7 +1511,9 @@ static ssize_t attr_prox_enable_store(struct device *dev,
 
 	if (value)
     {
+        mutex_lock(&chip->reg_lock);
         taos_prox_on();
+        mutex_unlock(&chip->reg_lock);
 
         if (taos_datap->prox_spy_enable && !taos_datap->prox_debug && taos_datap->prox_thres_have_cal)
         {
@@ -1548,24 +1552,16 @@ static ssize_t attr_prox_init_store(struct device *dev,
 
 	if (value ==1)
     {
-    	if((ret=taos_read_cal_value(PATH_PROX_OFFSET))>0)
+        if ((ret=taos_read_cal_value(PATH_PROX_OFFSET)) >= 0)
         {
 		    taos_cfgp->prox_config_offset = ret;
         }
 
-        if((ret=taos_read_cal_value(PATH_PROX_UNCOVER_DATA))>0)
+        if ((ret=taos_read_cal_value(PATH_PROX_UNCOVER_DATA)) >= 0)
         {
             taos_datap->prox_uncover_data = ret;
 
-            taos_datap->prox_thres_hi_min = taos_datap->prox_uncover_data + PROX_THRESHOLD_SAFE_DISTANCE;
-            taos_datap->prox_thres_hi_max = taos_datap->prox_thres_hi_min + PROX_THRESHOLD_DISTANCE / 2;
-            taos_datap->prox_thres_hi_max = (taos_datap->prox_thres_hi_max > PROX_THRESHOLD_HIGH_MAX) ? PROX_THRESHOLD_HIGH_MAX : taos_datap->prox_thres_hi_max;
-            taos_datap->prox_thres_lo_min = taos_datap->prox_uncover_data + PROX_THRESHOLD_DISTANCE;
-            taos_datap->prox_thres_lo_max = taos_datap->prox_uncover_data + PROX_THRESHOLD_DISTANCE * 2;
-
-            SENSOR_LOG_ERROR("prox_uncover_data = %d\n", taos_datap->prox_uncover_data);
-            SENSOR_LOG_ERROR("prox_thres_hi range is [%d--%d]\n", taos_datap->prox_thres_hi_min, taos_datap->prox_thres_hi_max);
-            SENSOR_LOG_ERROR("prox_thres_lo range is [%d--%d]\n", taos_datap->prox_thres_lo_min, taos_datap->prox_thres_lo_max);
+            taos_prox_uncover_data_check();
         }
 
     	if((ret=taos_read_cal_value(CAL_THRESHOLD))<0)
@@ -1913,7 +1909,6 @@ static void taos_irq_work_func(struct work_struct * work) //iVIZM
     if (wakeup_from_sleep)
     {
         SENSOR_LOG_INFO(" wakeup_from_sleep = true\n");
-        mdelay(50);
         wakeup_from_sleep = false;
     }
 
@@ -2040,7 +2035,8 @@ static int taos_als_get_data(void)//iVIZM
 
     if (reg_val != prox_int_time_param)
     {
-        lux_val = (lux_val * (101 - (0XFF - reg_val)))/20;
+        //lux_val = (lux_val * (101 - (0XFF - reg_val)))/20;
+        lux_val = lux_val *(0xFF - ALS_ADC_TIME_DEFAULT) / (0xFF - reg_val);
     }
 
     lux_val = taos_lux_filter(lux_val);
@@ -2232,8 +2228,10 @@ static void tmd2772_data_init(void)
     taos_datap->prox_offset_cal_result = false;
 	taos_datap->prox_offset_cal_verify = true;
 	taos_datap->prox_calibrate_verify = true;
-    taos_datap->prox_thres_hi_max = PROX_THRESHOLD_HIGH_MAX;
-    taos_datap->prox_thres_hi_min = PROX_THRESHOLD_HIGH_MIN;
+    taos_datap->prox_thres_hi_min = PROX_DEFAULT_THRESHOLD_HIGH;
+    taos_datap->prox_thres_hi_max = PROX_DEFAULT_THRESHOLD_HIGH;
+    taos_datap->prox_thres_lo_min = PROX_DEFAULT_THRESHOLD_LOW;
+    taos_datap->prox_thres_lo_max = PROX_DEFAULT_THRESHOLD_LOW;
     taos_datap->prox_data_max     = PROX_DATA_MAX;
     taos_datap->prox_offset_cal_per_bit = taos_datap->prox_offset_cal_ability * taos_datap->prox_led_plus_cnt;
     taos_datap->prox_uncover_data = 0;
@@ -2416,6 +2414,7 @@ static int tmd2772_probe(struct i2c_client *clientp, const struct i2c_device_id 
 	sema_init(&taos_datap->update_lock,1);
 	mutex_init(&(taos_datap->lock));
 	mutex_init(&(taos_datap->prox_work_lock));
+	mutex_init(&(taos_datap->reg_lock));
     wake_lock_init(&taos_datap->proximity_wakelock.lock, WAKE_LOCK_SUSPEND, "proximity-wakelock");
 
     tmd2772_parse_dt(taos_datap);
@@ -2882,7 +2881,9 @@ static int taos_als_gain_set(unsigned als_gain)
 
 static void taos_als_poll_work_func(struct work_struct *work)
 {
+    mutex_lock(&taos_datap->reg_lock);
     taos_als_get_data();
+    mutex_unlock(&taos_datap->reg_lock);
     if (true == taos_datap->als_on)
     {
         schedule_delayed_work(&taos_datap->als_poll_work, msecs_to_jiffies(als_poll_time_mul*als_poll_delay));
@@ -2932,6 +2933,38 @@ static int taos_prox_offset_calculate(int data, int target)
     return offset;
 }
 
+static void taos_prox_uncover_data_check(void)
+{
+    if (taos_datap->prox_uncover_data < PROX_DATA_SAFE_RANGE_MAX)
+    {
+        taos_datap->prox_thres_hi_min = taos_datap->prox_uncover_data + PROX_THRESHOLD_SAFE_DISTANCE;
+        taos_datap->prox_thres_hi_min = (taos_datap->prox_thres_hi_min > PROX_THRESHOLD_HIGH_MIN) ? taos_datap->prox_thres_hi_min : PROX_THRESHOLD_HIGH_MIN;
+
+        taos_datap->prox_thres_hi_max = taos_datap->prox_thres_hi_min + PROX_THRESHOLD_DISTANCE / 2;
+        taos_datap->prox_thres_hi_max = (taos_datap->prox_thres_hi_max > PROX_THRESHOLD_HIGH_MAX) ? PROX_THRESHOLD_HIGH_MAX : taos_datap->prox_thres_hi_max;
+
+        taos_datap->prox_thres_lo_min = taos_datap->prox_uncover_data + PROX_THRESHOLD_DISTANCE;
+        taos_datap->prox_thres_lo_min = (taos_datap->prox_thres_lo_min > PROX_THRESHOLD_LOW_MIN) ? taos_datap->prox_thres_lo_min : PROX_THRESHOLD_LOW_MIN;
+
+        taos_datap->prox_thres_lo_max = taos_datap->prox_thres_lo_min + PROX_THRESHOLD_DISTANCE;
+        if (taos_datap->prox_thres_lo_max > (taos_datap->prox_thres_hi_min - 100))
+        {
+            taos_datap->prox_thres_lo_max = (taos_datap->prox_thres_hi_min - 100);
+        }
+        SENSOR_LOG_ERROR("get uncover data success\n");
+    }
+    else
+    {
+        taos_datap->prox_thres_hi_min = PROX_DEFAULT_THRESHOLD_HIGH;
+        taos_datap->prox_thres_hi_max = PROX_DEFAULT_THRESHOLD_HIGH;
+        taos_datap->prox_thres_lo_min = PROX_DEFAULT_THRESHOLD_LOW;
+        taos_datap->prox_thres_lo_max = PROX_DEFAULT_THRESHOLD_LOW;
+        SENSOR_LOG_ERROR("get uncover data failed for data too high\n");
+    }
+    SENSOR_LOG_ERROR("prox_thres_hi range is [%d--%d]\n", taos_datap->prox_thres_hi_min, taos_datap->prox_thres_hi_max);
+    SENSOR_LOG_ERROR("prox_thres_lo range is [%d--%d]\n", taos_datap->prox_thres_lo_min, taos_datap->prox_thres_lo_max);
+}
+
 static int taos_prox_uncover_data_get(void)
 {
     u8 i = 0, j = 0;
@@ -2962,28 +2995,8 @@ static int taos_prox_uncover_data_get(void)
     taos_datap->prox_uncover_data = prox_sum / j;
     SENSOR_LOG_ERROR("prox_uncover_data = %d\n", taos_datap->prox_uncover_data);
 
-    if (taos_datap->prox_uncover_data < PROX_DATA_SAFE_RANGE_MAX)
-    {
-        taos_datap->prox_thres_hi_min = taos_datap->prox_uncover_data + PROX_THRESHOLD_SAFE_DISTANCE;
-        taos_datap->prox_thres_hi_max = taos_datap->prox_thres_hi_min + PROX_THRESHOLD_DISTANCE / 2;
-        taos_datap->prox_thres_hi_max = (taos_datap->prox_thres_hi_max > PROX_THRESHOLD_HIGH_MAX) ? PROX_THRESHOLD_HIGH_MAX : taos_datap->prox_thres_hi_max;
-        taos_datap->prox_thres_lo_min = taos_datap->prox_uncover_data + PROX_THRESHOLD_DISTANCE;
-        taos_datap->prox_thres_lo_max = taos_datap->prox_uncover_data + PROX_THRESHOLD_DISTANCE * 2;
-        SENSOR_LOG_ERROR("get uncover data success\n");
-    }
-    else
-    {
-        taos_datap->prox_thres_hi_min = PROX_DEFAULT_THRESHOLD_HIGH;
-        taos_datap->prox_thres_hi_max = PROX_DEFAULT_THRESHOLD_HIGH;
-        taos_datap->prox_thres_lo_min = PROX_DEFAULT_THRESHOLD_LOW;
-        taos_datap->prox_thres_lo_max = PROX_DEFAULT_THRESHOLD_LOW;
-        SENSOR_LOG_ERROR("get uncover data failed for data too high\n");
-    }
-
-    SENSOR_LOG_ERROR("prox_thres_hi range is [%d--%d]\n", taos_datap->prox_thres_hi_min, taos_datap->prox_thres_hi_max);
-    SENSOR_LOG_ERROR("prox_thres_lo range is [%d--%d]\n", taos_datap->prox_thres_lo_min, taos_datap->prox_thres_lo_max);
-
     taos_write_cal_file(PATH_PROX_UNCOVER_DATA, taos_datap->prox_uncover_data);
+    taos_prox_uncover_data_check();
 
     return 0;
 
@@ -3546,23 +3559,6 @@ static int taos_prox_on(void)
     taos_datap->prox_on = 1;
     als_poll_time_mul = 2;
     SENSOR_LOG_INFO("######## PROX ON #########\n");
-
-    if (true==taos_datap->als_on)
-    {
-        if ((ret = (i2c_smbus_write_byte_data(taos_datap->client, (TAOS_TRITON_CMD_REG|0x01), TAOS_ALS_ADC_TIME_WHEN_PROX_ON))) < 0)
-        {
-            SENSOR_LOG_ERROR("i2c_smbus_write_byte_data failed in ioctl prox_on\n");
-            goto taos_prox_on_failed;
-        }
-    }
-    else
-    {
-        if ((ret = (i2c_smbus_write_byte_data(taos_datap->client, (TAOS_TRITON_CMD_REG|0x01), 0XFF))) < 0)
-        {
-            SENSOR_LOG_ERROR("i2c_smbus_write_byte_data failed in ioctl prox_on\n");
-            goto taos_prox_on_failed;
-        }
-    }
 
     taos_update_sat_als();
 

@@ -3069,6 +3069,7 @@ static void smbchg_aicl_deglitch_wa_check(struct smbchg_chip *chip)
 #define LOADING_BATT_TYPE	"Loading Battery Data"
 #ifdef CONFIG_ZTEMT_MSM8994_CHARGER
 #define SMGCHARGE_IDEV_CHG_MAX	1000
+#define SMBGHARGE_USB_LIMIT_CHG_MAX	1500
 #endif
 static int smbchg_config_chg_battery_type(struct smbchg_chip *chip)
 {
@@ -3230,6 +3231,7 @@ static void smbchg_external_power_changed(struct power_supply *psy)
 		else if (prop.intval == POWER_SUPPLY_TYPE_USB_DCP)
 			current_limit = min(current_limit, SMGCHARGE_IDEV_CHG_MAX);
 	}
+	current_limit = min(current_limit, SMBGHARGE_USB_LIMIT_CHG_MAX);
 #endif
 
 	read_usb_type(chip, &usb_type_name, &usb_supply_type);
@@ -6234,7 +6236,7 @@ static void smbchg_check_the_usb_current(struct smbchg_chip *chip)
 			return ;
 		}
 		usb_curr_reg_val = reg&USBIN_INPUT_MASK;
-		if (usb_curr_reg_val != USB_CURRENT_REG_VAL_500mA) {
+		if (usb_curr_reg_val < USB_CURRENT_REG_VAL_500mA) {
 			printk("jing smbchg_check_the_usb_current  reg:%d",reg);
 			smbchg_set_usb_current_max(chip, CURRENT_500_MA);
 		}

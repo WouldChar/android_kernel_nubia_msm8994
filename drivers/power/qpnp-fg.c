@@ -1113,6 +1113,15 @@ static u8 batt_to_setpoint_8b(int vbatt_mv)
 	return DIV_ROUND_CLOSEST(val, 5);
 }
 
+#ifdef CONFIG_ZTEMT_MSM8994_FUEL_GAUGE
+static int bound_soc(int soc)
+{
+	soc = max(0, soc);
+	soc = min(100, soc);
+	return soc;
+}
+#endif
+
 static int get_current_time(unsigned long *now_tm_sec)
 {
 	struct rtc_time tm;
@@ -1265,6 +1274,10 @@ static int get_monotonic_soc_raw(struct fg_chip *chip)
 	return cap[0];
 }
 
+#ifdef CONFIG_ZTEMT_MSM8994_FUEL_GAUGE
+static int get_sram_prop_now(struct fg_chip *chip, unsigned int type);
+#endif
+
 #define EMPTY_CAPACITY		0
 #define DEFAULT_CAPACITY	50
 #define MISSING_CAPACITY	100
@@ -1277,7 +1290,11 @@ static int get_prop_capacity(struct fg_chip *chip)
 	if (chip->battery_missing)
 		return MISSING_CAPACITY;
 	if (!chip->profile_loaded && !chip->use_otp_profile)
+#ifdef CONFIG_ZTEMT_MSM8994_FUEL_GAUGE
+		return bound_soc(get_sram_prop_now(chip,FG_DATA_BATT_SOC) / 100);
+#else
 		return DEFAULT_CAPACITY;
+#endif
 	if (chip->charge_full)
 		return FULL_CAPACITY;
 	if (chip->soc_empty) {
