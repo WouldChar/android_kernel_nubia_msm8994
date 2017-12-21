@@ -106,8 +106,6 @@
 #include "wlan_hdd_ocb.h"
 #include "qwlan_version.h"
 
-#include "wlan_hdd_memdump.h"
-
 #include "wlan_logging_sock_svc.h"
 #include "sapApi.h"
 #include "csrApi.h"
@@ -888,6 +886,9 @@ wlan_hdd_pno_config_policy[QCA_WLAN_VENDOR_ATTR_PNO_MAX + 1] = {
     [QCA_WLAN_VENDOR_ATTR_EPNO_BAND5GHZ_BONUS] = {
         .type = NLA_U32
     },
+    [QCA_WLAN_VENDOR_ATTR_PNO_CONFIG_REQUEST_ID] = {
+         .type = NLA_U32
+    },
 };
 
 static const struct nla_policy
@@ -1320,12 +1321,6 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] =
         .vendor_id = QCA_NL80211_VENDOR_ID,
         .subcmd = QCA_NL80211_VENDOR_SUBCMD_DCC_STATS_EVENT
     },
-#ifdef WLAN_FEATURE_MEMDUMP
-    [QCA_NL80211_VENDOR_SUBCMD_WIFI_LOGGER_MEMORY_DUMP_INDEX] = {
-        .vendor_id = QCA_NL80211_VENDOR_ID,
-        .subcmd = QCA_NL80211_VENDOR_SUBCMD_WIFI_LOGGER_MEMORY_DUMP
-    },
-#endif /* WLAN_FEATURE_MEMDUMP */
     [QCA_NL80211_VENDOR_SUBCMD_MONITOR_RSSI_INDEX] = {
         .vendor_id = QCA_NL80211_VENDOR_ID,
         .subcmd = QCA_NL80211_VENDOR_SUBCMD_MONITOR_RSSI
@@ -4460,12 +4455,12 @@ static int __wlan_hdd_cfg80211_set_epno_list(struct wiphy *wiphy,
 	req_msg->num_networks = num_networks;
 
 	/* Parse and fetch request Id */
-	if (!tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_REQUEST_ID]) {
+	if (!tb[QCA_WLAN_VENDOR_ATTR_PNO_CONFIG_REQUEST_ID]) {
 		hddLog(LOGE, FL("attr request id failed"));
 		goto fail;
 	}
 	req_msg->request_id = nla_get_u32(
-	    tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_REQUEST_ID]);
+	    tb[QCA_WLAN_VENDOR_ATTR_PNO_CONFIG_REQUEST_ID]);
 
 	req_msg->session_id = adapter->sessionId;
 	hddLog(LOG1, FL("Req Id %u Session Id %d"),
@@ -6661,8 +6656,6 @@ __wlan_hdd_cfg80211_get_logger_supp_feature(struct wiphy *wiphy,
 
 	features = 0;
 
-	if (hdd_is_memdump_supported())
-		features |= WIFI_LOGGER_MEMORY_DUMP_SUPPORTED;
 	features |= WIFI_LOGGER_PER_PACKET_TX_RX_STATUS_SUPPORTED;
 	features |= WIFI_LOGGER_CONNECT_EVENT_SUPPORTED;
 	features |= WIFI_LOGGER_WAKE_LOCK_SUPPORTED;
@@ -11568,16 +11561,6 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] =
 			WIPHY_VENDOR_CMD_NEED_RUNNING,
 		.doit = wlan_hdd_cfg80211_get_logger_supp_feature
 	},
-#ifdef WLAN_FEATURE_MEMDUMP
-	{
-		.info.vendor_id = QCA_NL80211_VENDOR_ID,
-		.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_WIFI_LOGGER_MEMORY_DUMP,
-		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
-			WIPHY_VENDOR_CMD_NEED_NETDEV |
-			WIPHY_VENDOR_CMD_NEED_RUNNING,
-		.doit = wlan_hdd_cfg80211_get_fw_mem_dump
-	},
-#endif /* WLAN_FEATURE_MEMDUMP */
 	{
 		.info.vendor_id = QCA_NL80211_VENDOR_ID,
 		.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_WIFI_LOGGER_START,
@@ -12593,14 +12576,14 @@ static void wlan_hdd_add_hostapd_conf_vsie(hdd_adapter_t* pHostapdAdapter,
         elem_id  = ptr[0];
         elem_len = ptr[1];
         left -= 2;
-        if (elem_len > left || elem_len < WPS_OUI_TYPE_SIZE)
+        if (elem_len > left)
         {
             hddLog( VOS_TRACE_LEVEL_ERROR,
                     "****Invalid IEs eid = %d elem_len=%d left=%d*****",
                     elem_id, elem_len, left);
             return;
         }
-        if (IE_EID_VENDOR == elem_id)
+        if ((IE_EID_VENDOR == elem_id) && (elem_len >= WPS_OUI_TYPE_SIZE))
         {
             /* skipping the VSIE's which we don't want to include or
              * it will be included by existing code
@@ -15829,15 +15812,24 @@ static int __wlan_hdd_cfg80211_add_key( struct wiphy *wiphy,
         return -EINVAL;
     }
 
+    if (CSR_MAX_RSC_LEN < params->seq_len)
+    {
+        hddLog(VOS_TRACE_LEVEL_ERROR,"%s: Invalid seq length %d", __func__,
+                params->seq_len);
+
+        return -EINVAL;
+    }
+
     hddLog(VOS_TRACE_LEVEL_INFO,
-           "%s: called with key index = %d & key length %d",
-           __func__, key_index, params->key_len);
+           "%s: called with key index = %d & key length %d & seq length %d",
+           __func__, key_index, params->key_len, params->seq_len);
 
     /*extract key idx, key len and key*/
     vos_mem_zero(&setKey,sizeof(tCsrRoamSetKey));
     setKey.keyId = key_index;
     setKey.keyLength = params->key_len;
     vos_mem_copy(&setKey.Key[0],params->key, params->key_len);
+    vos_mem_copy(&setKey.keyRsc[0], params->seq, params->seq_len);
 
     switch (params->cipher)
     {
